@@ -12,4 +12,6 @@ import com.multistorage_upload.backend.Features.DB_Storage.Dtos.PhotoResponse;
 @Repository 
 public interface  PhotoRepository extends  JpaRepository<PhotoEntity, Long>{
 
+
+    List<PhotoEntity> findAllByOrderByCreatedAtDesc();
 }

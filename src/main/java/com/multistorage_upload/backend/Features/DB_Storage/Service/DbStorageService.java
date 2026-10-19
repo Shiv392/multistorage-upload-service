@@ -35,7 +35,7 @@ public class DbStorageService {
     }
     
     public List<PhotoResponse> getPhotos(){
-       List<PhotoEntity>photos = this.photoRepository.findAll();
+       List<PhotoEntity>photos = this.photoRepository.findAllByOrderByCreatedAtDesc();
        return photos.stream().map(PhotoResponse :: from).toList();
     }
 

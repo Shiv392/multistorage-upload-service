@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.multistorage_upload.backend.Features.DB_Storage.Dtos.PhotoResponse;
 import com.multistorage_upload.backend.Features.DB_Storage.Dtos.PhotoUploadRequest;
 import com.multistorage_upload.backend.Utils.Exceptions.BadRequestException;
+import com.multistorage_upload.backend.Utils.Exceptions.NotFoundException;
 import com.multistorage_upload.backend.Utils.Validations.PhotoRequestValidation;
 
 import jakarta.transaction.Transactional;
@@ -63,5 +64,14 @@ public class DbStorageService {
 
         PhotoEntity saved = this.photoRepository.save(newPhoto);
         return PhotoResponse.from(saved);
+    }
+
+    public boolean removePhoto(long id){
+        if(!photoRepository.existsById(id)){
+            throw new NotFoundException("Invalid Photo id");
+        }
+
+        this.photoRepository.deleteById(id);
+        return true;
     }
 }

@@ -37,9 +37,8 @@ public class ServerStorageController{
     }
 
     @GetMapping
-    public ResponseEntity<GlobalApiResponse<List<ServerPhotoDataResponse>>> getAllPhotos() {
-
-        List<ServerPhotoDataResponse> images = serverStorageService.getAllImages();
+    public ResponseEntity<GlobalApiResponse<List<PhotoResponse>>> getAllPhotos() {
+        List<PhotoResponse> images = serverStorageService.getAllImages();
         return ResponseEntity.ok(
                 new GlobalApiResponse(
                         true,
@@ -49,11 +48,12 @@ public class ServerStorageController{
         );
     }
 
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<GlobalApiResponse> addPhoto(@RequestParam("file") MultipartFile file) {
-        ServerPhotoResponse saved = serverStorageService.uploadImage(file);
-        return ResponseEntity.status(HttpStatus.CREATED)
-            .body(new GlobalApiResponse(true, "Photo added successfully", saved));
-    }
+    @PostMapping
+public ResponseEntity<GlobalApiResponse<PhotoResponse>> addPhoto(
+        @Valid @ModelAttribute PhotoUploadRequest request) {
+    PhotoResponse saved = serverStorageService.uploadImage(request);
+    return ResponseEntity.status(HttpStatus.CREATED)
+            .body(new GlobalApiResponse<>(true, "Photo added successfully", saved));
+}
     
 }

@@ -11,9 +11,15 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
@@ -24,8 +30,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
-import com.multistorage_upload.backend.Features.Server_Storage.Dtos.ServerPhotoDataResponse;
-import com.multistorage_upload.backend.Features.Server_Storage.Dtos.ServerPhotoResponse;
+import com.multistorage_upload.backend.Features.DB_Storage.Dtos.PhotoResponse;
+import com.multistorage_upload.backend.Features.DB_Storage.Dtos.PhotoUploadRequest;
 import com.multistorage_upload.backend.Utils.Exceptions.BadRequestException;
 
 @Service
@@ -35,15 +41,19 @@ public class ServerStorageService {
     private static final Set<String> IMAGE_EXT = Set.of("jpg", "jpeg", "png", "gif", "webp");
     private static final Set<String> ALLOWED_TYPES =
             Set.of("image/jpeg", "image/png", "image/gif", "image/webp");
-            
+
     private static final long MAX_SIZE = 2 * 1024 * 1024; // 2MB
     private static final int HEADER_SIZE = 12;
+    private static final int MAX_FILENAME_LENGTH = 255;   // zyadatar filesystems ki limit
+    private static final String SEP = ".";
+    private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
 
     private final Path uploadDir;
     private final ExecutorService executor = Executors.newFixedThreadPool(8);
 
     public ServerStorageService(@Value("${app.storage.upload-dir}") String dir) {
         this.uploadDir = Paths.get(dir).toAbsolutePath().normalize();
+        log.info("Upload directory: {}", this.uploadDir);
         try {
             Files.createDirectories(this.uploadDir);
         } catch (IOException e) {
@@ -52,7 +62,10 @@ public class ServerStorageService {
     }
 
     // ---------- POST ----------
-    public ServerPhotoResponse uploadImage(MultipartFile file) {
+    public PhotoResponse uploadImage(PhotoUploadRequest request) {
+        MultipartFile file = request.getFile();
+        String description = request.getDescription();
+
         if (file == null || file.isEmpty()) {
             throw new BadRequestException("File is required");
         }
@@ -70,14 +83,32 @@ public class ServerStorageService {
             throw new BadRequestException("File content does not match a valid image type");
         }
 
-        // Original filename kabhi path mein use mat karo (path traversal risk)
-        String savedName = UUID.randomUUID() + "." + extensionFor(detectedType);
+        if (description!=null && description.getBytes(StandardCharsets.UTF_8).length > 80) {
+    throw new BadRequestException("Description must be at most 80 bytes for server storage");
+}
+
+        String originalName = (file.getOriginalFilename() == null || file.getOriginalFilename().isBlank())
+                ? "unnamed" : file.getOriginalFilename();
+        String desc = description == null ? "" : description;
+        LocalDateTime createdAt = LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS);
+
+        // uuid.createdAt.name(b64).description(b64).ext
+        String savedName = String.join(SEP,
+                UUID.randomUUID().toString(),
+                createdAt.format(TS),
+                encode(originalName),
+                encode(desc),
+                extensionFor(detectedType));
+
+        if (savedName.length() > MAX_FILENAME_LENGTH) {
+            throw new BadRequestException("File name and description are too long");
+        }
+
         Path target = uploadDir.resolve(savedName).normalize();
 
         try (InputStream in = file.getInputStream()) {
             Files.copy(in, target);
         } catch (IOException e) {
-            // adhoori file chhod ke mat jao
             try {
                 Files.deleteIfExists(target);
             } catch (IOException ignored) {
@@ -86,11 +117,16 @@ public class ServerStorageService {
             throw new UncheckedIOException("Failed to store file", e);
         }
 
-        return new ServerPhotoResponse(savedName, detectedType, file.getSize());
+        try {
+            return new PhotoResponse(null, originalName, detectedType, file.getBytes(),
+                    file.getSize(), desc.isEmpty() ? null : desc, createdAt);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not read uploaded file", e);
+        }
     }
 
     // ---------- GET ----------
-    public List<ServerPhotoDataResponse> getAllImages() {
+    public List<PhotoResponse> getAllImages() {
         List<Path> files;
         try (Stream<Path> stream = Files.list(uploadDir)) {
             files = stream
@@ -102,7 +138,7 @@ public class ServerStorageService {
         }
 
         // Pehle saare tasks submit karo (parallel chalenge)
-        List<CompletableFuture<ServerPhotoDataResponse>> futures = files.stream()
+        List<CompletableFuture<PhotoResponse>> futures = files.stream()
                 .map(path -> CompletableFuture
                         .supplyAsync(() -> readImage(path), executor)
                         .exceptionally(ex -> {
@@ -115,13 +151,57 @@ public class ServerStorageService {
         return futures.stream()
                 .map(CompletableFuture::join)
                 .filter(Objects::nonNull)
+                .sorted((a, b) -> b.createdAt().compareTo(a.createdAt()))   // newest first
                 .toList();
     }
 
     // ---------- helpers ----------
+    private PhotoResponse readImage(Path path) {
+        try {
+            byte[] bytes = Files.readAllBytes(path);
+            String fileName = path.getFileName().toString();
+            String[] parts = fileName.split("\\.", -1);   // -1: khaali description wala segment bhi mile
+
+            // Naya format: uuid.createdAt.name.description.ext
+            if (parts.length == 5) {
+                try {
+                    LocalDateTime createdAt = LocalDateTime.parse(parts[1], TS);
+                    String desc = decode(parts[3]);
+                    return new PhotoResponse(
+                            null,
+                            decode(parts[2]),
+                            typeFor(parts[4]),
+                            bytes,
+                            bytes.length,
+                            desc.isEmpty() ? null : desc,
+                            createdAt);
+                } catch (RuntimeException e) {
+                    log.warn("Filename metadata is malformed, using fallback for {}", fileName);
+                }
+            }
+
+            // Fallback: purani file (sirf uuid.ext) ya kharab naam
+            LocalDateTime modified = LocalDateTime.ofInstant(
+                    Files.getLastModifiedTime(path).toInstant(), ZoneId.systemDefault());
+            return new PhotoResponse(null, fileName, typeFor(parts[parts.length - 1]),
+                    bytes, bytes.length, null, modified);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static String encode(String value) {
+        return Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String decode(String value) {
+        return new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
+    }
+
     private byte[] readHeader(MultipartFile file) {
         try (InputStream in = file.getInputStream()) {
-            return in.readNBytes(HEADER_SIZE);   // file chhoti ho toh kam bytes milenge, error nahi
+            return in.readNBytes(HEADER_SIZE);
         } catch (IOException e) {
             throw new UncheckedIOException("Could not read file header", e);
         }
@@ -148,21 +228,6 @@ public class ServerStorageService {
         return null;
     }
 
-    private ServerPhotoDataResponse readImage(Path path) {
-        try {
-            byte[] bytes = Files.readAllBytes(path);
-            String contentType = Files.probeContentType(path);
-            return new ServerPhotoDataResponse(
-                    path.getFileName().toString(),
-                    contentType != null ? contentType : "application/octet-stream",
-                    bytes.length,
-                    Base64.getEncoder().encodeToString(bytes)
-            );
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
     private boolean isImage(Path path) {
         String name = path.getFileName().toString().toLowerCase();
         int dot = name.lastIndexOf('.');
@@ -176,6 +241,16 @@ public class ServerStorageService {
             case "image/gif" -> "gif";
             case "image/webp" -> "webp";
             default -> throw new BadRequestException("Unsupported type");
+        };
+    }
+
+    private String typeFor(String ext) {
+        return switch (ext.toLowerCase()) {
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "png" -> "image/png";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            default -> "application/octet-stream";
         };
     }
 

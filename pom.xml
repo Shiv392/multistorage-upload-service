@@ -97,6 +97,12 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>signin</artifactId>
         </dependency>
+
+        <!-- AWS S3 Dependency  -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+        </dependency>
     </dependencies>
 
 

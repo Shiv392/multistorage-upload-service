@@ -62,12 +62,13 @@ public class BucketPhotosEntity {
 
     public BucketPhotosEntity(){};
 
-    public BucketPhotosEntity(String _name, String _contentType, String _photoKey, String _description){
+    public BucketPhotosEntity(String _name, long _size, String _contentType, String _photoKey, String _description){
         name = _name;
         contentType = _contentType;
         photoKey = _photoKey;
         description = _description;
         this.createdAt = LocalDateTime.now();
+        size = _size;
     }
 
     public long getId(){
@@ -83,7 +84,7 @@ public class BucketPhotosEntity {
     public long getSize(){
         return size;
     }
-    
+
     public String getPhotoKey(){
         return photoKey;
     }

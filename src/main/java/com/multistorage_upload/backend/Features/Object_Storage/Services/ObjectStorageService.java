@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -24,6 +25,8 @@ import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -130,33 +133,56 @@ public class ObjectStorageService {
 
         //2. build s3 upload request
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-        .bucket(bucketName)
-        .key(photoKey)
-        .contentType(contentType)
-        .contentLength(size)
-        .build();
+                .bucket(bucketName)
+                .key(photoKey)
+                .contentType(contentType)
+                .contentLength(size)
+                .build();
 
         //3. upload actual file bytes to s3
         s3Client.putObject(putObjectRequest, RequestBody.fromBytes(bytes));
 
         //4. save photo meta data into the db
         BucketPhotosEntity newEntity = new BucketPhotosEntity(
-            fileName,
-            size,
-            contentType,
-            photoKey,
-            description
+                fileName,
+                size,
+                contentType,
+                photoKey,
+                description
         );
         BucketPhotosEntity saved = this.bucketPhotoRepo.save(newEntity);
 
         return new PhotoResponse(
-            saved.getId(),
-            saved.getName(),
-            saved.getContentType(),
-            bytes,
-            saved.getSize(),
-            saved.getDescription(),
-            saved.getCreatedAt()
+                saved.getId(),
+                saved.getName(),
+                saved.getContentType(),
+                bytes,
+                saved.getSize(),
+                saved.getDescription(),
+                saved.getCreatedAt()
         );
+    }
+
+    public boolean deleteServerBucketImage(long id) {
+        Optional<BucketPhotosEntity> entityOptional = this.bucketPhotoRepo.findById(id);
+        if (entityOptional.isEmpty()) {
+            throw new BadRequestException("Photo not exists");
+        }
+
+        BucketPhotosEntity entity = entityOptional.get();
+        String photoKey = entity.getPhotoKey();
+
+        DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
+                .bucket(bucketName)
+                .key(photoKey)
+                .build();
+
+        DeleteObjectResponse response = s3Client.deleteObject(deleteRequest);
+        if (response != null && response.sdkHttpResponse().isSuccessful()) {
+            bucketPhotoRepo.delete(entity);
+            return true;
+        }
+
+        throw new RuntimeException("Failed to delete photo from S3");
     }
 }

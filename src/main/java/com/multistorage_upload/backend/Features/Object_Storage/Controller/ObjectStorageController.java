@@ -5,8 +5,10 @@ import java.util.List;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -14,7 +16,9 @@ import com.multistorage_upload.backend.Features.DB_Storage.Dtos.PhotoResponse;
 import com.multistorage_upload.backend.Features.Object_Storage.Services.ObjectStorageService;
 import com.multistorage_upload.backend.Utils.ApiResponse.GlobalApiResponse;
 import com.multistorage_upload.backend.Features.DB_Storage.Dtos.PhotoUploadRequest;
+
 import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.PostMapping;
 
 
@@ -45,6 +49,21 @@ public class ObjectStorageController {
         return ResponseEntity.status(201)
         .body(
             new GlobalApiResponse(true, "New photo uploaded successfull", saveResponse)
+        );
+    }
+
+    @DeleteMapping("/server-bucket/photo/{id}")
+    public ResponseEntity<GlobalApiResponse> deleteServerBucketPhoto(@PathVariable  long id){
+        boolean isDeleted = this.objectStorageService.deleteServerBucketImage(id);
+        if(!isDeleted){
+            return ResponseEntity.status(500).body(
+                new GlobalApiResponse(false, "server error", null)
+            );
+        }
+
+        return ResponseEntity.status(200)
+        .body(
+            new GlobalApiResponse(true, "Photo has been deleted", null)
         );
     }
     

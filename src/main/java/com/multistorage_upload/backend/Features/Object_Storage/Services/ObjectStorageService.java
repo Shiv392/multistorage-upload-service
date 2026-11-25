@@ -150,7 +150,7 @@ public class ObjectStorageService {
                 photoKey,
                 description
         );
-        BucketPhotosEntity saved = this.bucketPhotoRepo.save(newEntity);
+        BucketPhotosEntity saved = this.bucketPhotoRepo.saveAndFlush(newEntity);
 
         return new PhotoResponse(
                 saved.getId(),

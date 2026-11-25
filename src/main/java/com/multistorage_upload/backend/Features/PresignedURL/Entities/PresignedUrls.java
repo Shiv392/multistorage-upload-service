@@ -45,7 +45,6 @@ public class PresignedUrls {
     private String contentType;
 
     @NotNull(message="File size is required")
-    @NotBlank(message="File size is required")
     @Max(value = MAX_SIZE_BYTES, message = "file size must not exceed 2MB")
     @Column(name = "size_in_bytes", nullable = false)
     private Long size_in_bytes;

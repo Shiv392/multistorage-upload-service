@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 
 import com.multistorage_upload.backend.Features.PresignedURL.Entities.PresignedUrls;
@@ -49,5 +50,13 @@ public class PresignedurlController {
             new GlobalApiResponse(true, "Presigned URL Created", preSignedURL)
         );
     }
-    
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<GlobalApiResponse> deleteFile(@PathVariable String id){
+        Long fileId = Long.parseLong(id);
+        return ResponseEntity.status(200)
+        .body(
+            new GlobalApiResponse(false, "File has been deleted", null)
+        );
+    }
 }

@@ -18,6 +18,7 @@ import com.multistorage_upload.backend.Features.PresignedURL.Classes.UploadStatu
 import com.multistorage_upload.backend.Utils.Exceptions.BadRequestException;
 
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
@@ -28,18 +29,20 @@ public class PreSignedUrlService {
     private final PreSignedUrlsRepo preSignedUrlsRepository;
     private final String bucketName;
     private final S3Presigner s3Presigner;
+    private final S3Client s3Client;
 
     private final Logger logger = LoggerFactory.getLogger(PreSignedUrlService.class);
 
     public PreSignedUrlService(
         PreSignedUrlsRepo _PreSignedUrlsRepo,
         S3Presigner _s3Presigner,
-        @Value("${app.aws.s3.bucket-name-presigned-urls}") String _bucketName
-
+        @Value("${app.aws.s3.bucket-name-presigned-urls}") String _bucketName,
+        S3Client _s3Client
     ){
         preSignedUrlsRepository = _PreSignedUrlsRepo;
         bucketName = _bucketName;
         s3Presigner = _s3Presigner;
+        s3Client = _s3Client;
     }
 
     public List<PresignedUrls> getAllFiles(){
@@ -92,13 +95,20 @@ public class PreSignedUrlService {
         }
 
         //check if id exists in the table or not
-        Boolean isExists = this.preSignedUrlsRepository.existsById(id);
-        if(!isExists || isExists == null){
-            throw new BadRequestException("File not exists");
-        }
+        PresignedUrls fileData = this.preSignedUrlsRepository.findById(id).
+        orElseThrow(()-> new BadRequestException("File not exists"));
 
-        //remove by id
-        this.preSignedUrlsRepository.deleteById(id);
+        String fileBucketKey = fileData.getFileBucketKey();
+
+        DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
+        .bucket(bucketName)
+        .key(fileBucketKey)
+        .build();
+
+        s3Client.deleteObject(deleteRequest);
+
+        //soft delete by marking deleted status
+        fileData.markDeleted();
 
         return true;
     }

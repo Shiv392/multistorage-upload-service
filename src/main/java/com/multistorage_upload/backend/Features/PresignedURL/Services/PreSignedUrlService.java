@@ -48,8 +48,8 @@ public class PreSignedUrlService {
 
     public String addFiles(String file){
         if (file == null || file.isBlank()) {
-    throw new BadRequestException("File is required");
-}
+        throw new BadRequestException("File is required");
+        }
         int lastDot = file.lastIndexOf(".");
 
         if (file == null || lastDot <= 0 || lastDot == file.length() - 1) {
@@ -82,7 +82,24 @@ public class PreSignedUrlService {
         .url()
         .toString();
 
-        logger.info("PreSigned url created........."+preSignedURL);
+        // logger.info("PreSigned url created........."+preSignedURL);
         return preSignedURL;
+    }
+
+    public Boolean deleteFileById(Long id){
+        if(id == null){
+             throw new BadRequestException("Invalid request");
+        }
+
+        //check if id exists in the table or not
+        Boolean isExists = this.preSignedUrlsRepository.existsById(id);
+        if(!isExists || isExists == null){
+            throw new BadRequestException("File not exists");
+        }
+
+        //remove by id
+        this.preSignedUrlsRepository.deleteById(id);
+
+        return true;
     }
 }

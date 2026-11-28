@@ -7,7 +7,7 @@ public record FileResponseDtos(
         String name,
         String contentType,
         byte[] data,
-        long size,
+        Long size,
         String description,
         LocalDateTime createdAt
 ) {

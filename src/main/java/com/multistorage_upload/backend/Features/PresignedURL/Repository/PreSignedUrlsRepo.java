@@ -11,5 +11,5 @@ import com.multistorage_upload.backend.Features.PresignedURL.Classes.UploadStatu
 
 public interface  PreSignedUrlsRepo extends JpaRepository<PresignedUrls, Long> {
     
-    List<PresignedUrls> findAllByUploadStatus(UploadStatus uploadStatus);
+    List<PresignedUrls> findAllByUploadStatusOrderByUpdatedAtDesc(UploadStatus uploadStatus);
 }

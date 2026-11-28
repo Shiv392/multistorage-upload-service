@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 
-import com.multistorage_upload.backend.Features.PresignedURL.Entities.PresignedUrls;
+import com.multistorage_upload.backend.Features.PresignedURL.Dtos.FileResponseDtos;
 import com.multistorage_upload.backend.Features.PresignedURL.Services.PreSignedUrlService;
 import com.multistorage_upload.backend.Utils.ApiResponse.GlobalApiResponse;
 
@@ -31,7 +31,7 @@ public class PresignedurlController {
     
     @GetMapping("")
     public ResponseEntity<GlobalApiResponse> getAllFiles() {
-        List<PresignedUrls>files = preSignedUrlService.getAllFiles();
+        List<FileResponseDtos>files = preSignedUrlService.getAllFiles();
 
         return ResponseEntity.status(200)
         .body(

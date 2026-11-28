@@ -62,9 +62,18 @@ public class PreSignedUrlService {
         String fileName = file.substring(0, lastDot);
         String extension = file.substring(lastDot);
 
-        String fileKey = "file/"+fileName+"/"+UUID.randomUUID()+extension;
+        String bucketFileKey = "file/"+fileName+"/"+UUID.randomUUID()+extension;
 
-        String preSignedURL = generatedPreSignedURL(fileKey);
+        String preSignedURL = generatedPreSignedURL(bucketFileKey);
+
+        //update schema for the request 
+        PresignedUrls newEntity = new PresignedUrls();
+        newEntity.setBucketKey(bucketFileKey);
+        newEntity.setFileName(fileName);
+        newEntity.setFileType(extension);
+        newEntity.setUploadStatus(UploadStatus.PENDING);
+
+        PresignedUrls res = this.preSignedUrlsRepository.saveAndFlush(newEntity);
 
         return preSignedURL;
     }

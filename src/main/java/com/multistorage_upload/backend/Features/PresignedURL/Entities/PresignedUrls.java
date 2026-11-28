@@ -49,15 +49,13 @@ public class PresignedUrls {
     @NotBlank(message = "File type is required")
     @Length(min = 1, max = 50, message = "Content type can't be more then 50 characters long")
     @Column(name = "content_type", nullable = false, length = 50)
-    private String contentType;
+    private String fileType;
 
-    @NotNull(message = "File size is required")
     @Max(value = MAX_SIZE_BYTES, message = "file size must not exceed 2MB")
-    @Column(name = "size_in_bytes", nullable = false)
+    @Column(name = "size_in_bytes")
     private Long size_in_bytes;
 
     @NotNull(message = "Upload status is required")
-    @NotBlank(message = "Upload status is required")
     @Enumerated(EnumType.STRING)
     @Column(name = "upload_status", nullable = false, length = 20)
     private UploadStatus uploadStatus = UploadStatus.PENDING;
@@ -81,21 +79,49 @@ public class PresignedUrls {
     public PresignedUrls() {
     }
 
-    public PresignedUrls(String _fileName, String _description, String _contentType, Long _byte, UploadStatus _uploadStatus,
-            String _fileBucketKey
-    ) {
-        fileName = _fileName;
-        description = _description;
-        contentType = _contentType;
-        size_in_bytes = _byte;
-        uploadStatus = _uploadStatus;
-        fileBucketKey = _fileBucketKey;
+    // public PresignedUrls(String _fileName, String _description, String _fileType, Long _byte, UploadStatus _uploadStatus,
+    //         String _fileBucketKey
+    // ) {
+    //     fileName = _fileName;
+    //     description = _description;
+    //     fileType = _fileType;
+    //     size_in_bytes = _byte;
+    //     uploadStatus = _uploadStatus;
+    //     fileBucketKey = _fileBucketKey;
+    // }
+    
+    // Setters methods =================================================>
+    public void setFileName(String fileName) {
+        this.fileName = fileName;
+    }
+
+    public void setDescription(String _description) {
+        this.description = description;
+    }
+
+    public void setFileType(String _fileType) {
+        this.fileType = _fileType;
+    }
+
+    public void setSize(Long _bytes) {
+        this.size_in_bytes = _bytes;
+    }
+
+    public void setBucketKey(String _bucketKey) {
+        this.fileBucketKey = _bucketKey;
+    }
+
+    public void setUploadStatus(UploadStatus _UploadStatus){
+        uploadStatus = _UploadStatus;
     }
 
     public void markDeleted() {
         this.uploadStatus = UploadStatus.DELETED;
         this.deletedAt = LocalDateTime.now();
     }
+
+
+    //Getters methods ==============================================================>
 
     public Long getId() {
         return id;
@@ -117,19 +143,19 @@ public class PresignedUrls {
         return uploadStatus;
     }
 
-    public String getContentType() {
-        return contentType;
+    public String getfileType() {
+        return fileType;
     }
 
     public String getFileBucketKey() {
         return fileBucketKey;
     }
 
-    public LocalDateTime getCreatedAt(){
+    public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public LocalDateTime getUpdatedAt(){
+    public LocalDateTime getUpdatedAt() {
         return updatedAt;
     }
 }

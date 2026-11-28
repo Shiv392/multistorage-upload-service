@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import com.multistorage_upload.backend.Features.PresignedURL.Entities.PresignedUrls;
 import com.multistorage_upload.backend.Features.PresignedURL.Repository.PreSignedUrlsRepo;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 
 import com.multistorage_upload.backend.Features.PresignedURL.Classes.UploadStatus;
+import com.multistorage_upload.backend.Features.PresignedURL.Dtos.FileResponseDtos;
 import com.multistorage_upload.backend.Utils.Exceptions.BadRequestException;
 
 import software.amazon.awssdk.services.s3.S3Client;
@@ -22,6 +24,11 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
+
+import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.core.sync.ResponseTransformer;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
 
 @Service 
@@ -45,8 +52,43 @@ public class PreSignedUrlService {
         s3Client = _s3Client;
     }
 
-    public List<PresignedUrls> getAllFiles(){
-        return this.preSignedUrlsRepository.findAllByUploadStatus(UploadStatus.UPLOADED);
+    public List<FileResponseDtos> getAllFiles(){
+        List<PresignedUrls>list = this.preSignedUrlsRepository.findAllByUploadStatusOrderByUpdatedAtDesc(UploadStatus.UPLOADED);
+        if(list == null || list.size() == 0) return new ArrayList<>();
+
+        List<FileResponseDtos>files = new ArrayList<>();
+
+        for(PresignedUrls entity : list){
+            String file_bucket_key = entity.getFileBucketKey();
+
+            //create object request to fetch files
+            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+            .bucket(bucketName)
+            .key(file_bucket_key)
+            .build();
+
+            //get object bytes for the key
+            ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObject(getObjectRequest, 
+                ResponseTransformer.toBytes());
+
+            // get bytes data from response 
+            byte[] data = objectBytes.asByteArray();
+
+            //create file response and push into the complete response
+            FileResponseDtos object = new FileResponseDtos(
+                entity.getId(),
+                entity.getFileName(),
+                entity.getfileType(),
+                data,
+                entity.getSize(),
+                entity.getDescription(),
+                entity.getCreatedAt()
+            );
+            
+            files.add(object);
+        }
+        
+        return files;
     }
 
     public String addFiles(String file){
